@@ -33,6 +33,17 @@
       font-size: 0.9rem;
       cursor: pointer;
     }
+    .container {
+      display: flex;
+      gap: 2rem;
+    }
+    .tests {
+      flex: 0 0 45%;
+    }
+    pre#output {
+      flex: 1;
+      margin-top: 0; /* already aligned to container */
+    }
     #output {
       white-space: pre-wrap;
       background: #272822;
@@ -41,7 +52,7 @@
       border-radius: 6px;
       max-height: 60vh;
       overflow-y: auto;
-      margin-top: 2rem;
+      margin-top: 0;
       font-family: "Courier New", monospace;
       font-size: 0.9rem;
     }
@@ -50,45 +61,66 @@
 <body>
   <h1>CRM API – Manual CRUD Tests</h1>
 
-  <div class="test" id="listContacts">
-    <h2>List all contacts</h2>
-    <p>GET /contacts – should return the current list of contacts.</p>
-    <button>Run Test</button>
-  </div>
+  <div class="container">
+    <!-- Left column: test buttons -->
+    <div class="tests">
+      <div class="test" id="listContacts">
+        <h2>List all contacts</h2>
+        <p>GET /contacts – current contacts in DB.</p>
+        <button>Run</button>
+      </div>
 
-  <div class="test" id="createContact">
-    <h2>Create a new contact</h2>
-    <p>POST /contacts – attempts to add a fresh contact with a unique email each time.</p>
-    <button>Run Test</button>
-  </div>
+      <div class="test" id="createContact">
+        <h2>Create contact</h2>
+        <p>POST /contacts – unique email generated every click.</p>
+        <button>Run</button>
+      </div>
 
-  <div class="test" id="getContact1">
-    <h2>Get contact ID 1</h2>
-    <p>GET /contacts/1 – retrieves contact with ID 1. May return 404 if it does not exist.</p>
-    <button>Run Test</button>
-  </div>
+      <div class="test" id="getContact1">
+        <h2>Get contact 1</h2>
+        <p>GET /contacts/1 – fetches first contact (if exists).</p>
+        <button>Run</button>
+      </div>
 
-  <div class="test" id="deleteNonExisting">
-    <h2>Delete non-existing contact</h2>
-    <p>DELETE /contacts/9999 – attempts to delete a contact that shouldn't exist and expects 404.</p>
-    <button>Run Test</button>
-  </div>
+      <div class="test" id="getMissing">
+        <h2>Get missing contact</h2>
+        <p>GET /contacts/9999 – expects 404.</p>
+        <button>Run</button>
+      </div>
 
-  <div id="output" aria-live="polite"></div>
+      <div class="test" id="updateContact1">
+        <h2>Update contact 1</h2>
+        <p>PUT /contacts/1 – updates phone to 555-9999.</p>
+        <button>Run</button>
+      </div>
+
+      <div class="test" id="deleteContact1">
+        <h2>Delete contact 1</h2>
+        <p>DELETE /contacts/1 – removes first contact (if exists).</p>
+        <button>Run</button>
+      </div>
+
+      <div class="test" id="duplicateEmail">
+        <h2>Create duplicate email</h2>
+        <p>POST /contacts – uses email duplicate@example.com to demo 409.</p>
+        <button>Run</button>
+      </div>
+    </div>
+
+    <!-- Right column: log output -->
+    <pre id="output" aria-live="polite"></pre>
+  </div>
 
   <script>
     // Define the CRUD test cases we expose to users
     const tests = {
       listContacts: {
-        title: "List contacts",
         method: "GET",
         url: "/contacts",
       },
       createContact: {
-        title: "Create contact",
         method: "POST",
         url: "/contacts",
-        // Generate body dynamically to avoid unique-constraint collisions
         body: () => ({
           first_name: "Jane",
           last_name: "Doe",
@@ -98,43 +130,53 @@
         }),
       },
       getContact1: {
-        title: "Get contact 1",
         method: "GET",
         url: "/contacts/1",
       },
-      deleteNonExisting: {
-        title: "Delete missing contact",
-        method: "DELETE",
+      getMissing: {
+        method: "GET",
         url: "/contacts/9999",
+      },
+      updateContact1: {
+        method: "PUT",
+        url: "/contacts/1",
+        body: {
+          phone: "555-9999",
+        },
+      },
+      deleteContact1: {
+        method: "DELETE",
+        url: "/contacts/1",
+      },
+      duplicateEmail: {
+        method: "POST",
+        url: "/contacts",
+        body: {
+          first_name: "Dupe",
+          last_name: "User",
+          email: "duplicate@example.com",
+          notes: "This email will collide on second run",
+        },
       },
     };
 
-    /**
-     * Append log lines to the output panel.
-     * @param {string} text
-     */
     function log(text) {
       const output = document.getElementById("output");
       const timestamp = new Date().toLocaleTimeString();
       output.textContent += `[${timestamp}] ${text}\n`;
-      output.scrollTop = output.scrollHeight; // auto-scroll to newest
+      output.scrollTop = output.scrollHeight;
     }
 
-    /**
-     * Execute the selected test case.
-     * @param {string} key – Key of the test in `tests`.
-     */
     async function runTest(key) {
       const test = tests[key];
       const reqInit = { method: test.method, headers: { "Content-Type": "application/json" } };
       if (test.body) {
         const bodyData = typeof test.body === "function" ? test.body() : test.body;
         reqInit.body = JSON.stringify(bodyData, null, 2);
-        log(`Request: ${test.method} ${test.url} – body: ${reqInit.body}`);
+        log(`Request: ${test.method} ${test.url}\nBody: ${reqInit.body}`);
       } else {
         log(`Request: ${test.method} ${test.url}`);
       }
-
       try {
         const res = await fetch(test.url, reqInit);
         const contentType = res.headers.get("content-type") || "";
@@ -150,11 +192,10 @@
       }
     }
 
-    // Attach click handlers to each test block's button
+    // Attach click handlers
     document.querySelectorAll(".test").forEach((div) => {
       const key = div.id;
-      const btn = div.querySelector("button");
-      btn.addEventListener("click", () => runTest(key));
+      div.querySelector("button").addEventListener("click", () => runTest(key));
     });
   </script>
 </body>
